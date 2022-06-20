@@ -4,7 +4,7 @@ Nueva versión de los scripts de creación de EmpleaFP
 ``` script
 passwd
 cd /opt
-git clone https://github.com/fpempresa/docker_webapps.git
+git clone https://github.com/fpempresa/docker_webapps_22.git
 cd ./docker_webapps/bin
 ./install.sh
 
