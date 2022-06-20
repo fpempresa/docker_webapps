@@ -27,15 +27,26 @@ APP_NAME=$2
 APP_ENVIRONMENT=$3
 APP_BASE_PATH=$BASE_PATH/apps/$APP_NAME/$APP_ENVIRONMENT
 
+
+NAME_DOCKER_IMAGE_TOMCAT=tomcat:7.0.91-jre7
+NAME_DOCKER_IMAGE_MYSQL=mysql/mysql-server:5.5.61
+NAME_DOCKER_IMAGE_JENKINS=jenkins/jenkins:2.144
+NAME_DOCKER_IMAGE_PROXY=jwilder/nginx-proxy:0.7.0
+NAME_DOCKER_IMAGE_LETSENCRYPT=jrcs/letsencrypt-nginx-proxy-companion:v1.12.1
+NAME_DOCKER_IMAGE_JDK_BUILDER=openjdk:7u181-jdk
+
+ENABLED_LETSENCRYPT=1
+
+
 #Cargar propiedades globales
 . $BASE_PATH/config/global.config
 
 sub_help(){
     echo "Uso: $ProgName <suborden> [opciones]"
     echo "Subordenes:"
-    echo "    start_proxy : Inicia el proxy y sus dependencias (monitor,certificadoss,etc)."
-    echo "    stop_proxy : Para el proxy y sus dependencias (monitor,certificadoss,etc)."
-    echo "    restart_proxy : Reinicia el proxy y sus dependencias (monitor,certificadoss,etc)."
+    echo "    start_proxy : Inicia el proxy y sus dependencias (certificadoss,etc)."
+    echo "    stop_proxy : Para el proxy y sus dependencias (certificadoss,etc)."
+    echo "    restart_proxy : Reinicia el proxy y sus dependencias (certificadoss,etc)."
     echo "    restart_all : Reinicia el proxy y el resto de las aplicaciones web y jenkins que estubieran arrancadas"
     echo ""
     echo "    add   : Añade una aplicacion y todos sus entornos. Pero no inicia las maquinas"
@@ -194,7 +205,7 @@ sub_start_proxy(){
 			-v /var/run/docker.sock:/tmp/docker.sock:ro \
 		  --label com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy \
 			--name nginx-proxy \
-			jwilder/nginx-proxy:0.7.0
+			${NAME_DOCKER_IMAGE_PROXY}
 
 
   for APP_FILE_NAME in $(find $BASE_PATH/config -maxdepth 1 -name "*.app.config" -exec basename {} \;); do
@@ -220,17 +231,8 @@ sub_start_proxy(){
     done
 	done
 
-	#Sistema de monitorizacion
-  if [ "$(docker network ls | grep cadvisor)" == "" ]; then
-    docker network create cadvisor
-  fi
 
-  if [ "$(docker network inspect cadvisor | grep  nginx-proxy)" == "" ]; then
-    docker network connect cadvisor nginx-proxy
-  fi
-
-  mkdir -p $BASE_PATH/var/cadvisor
-  htpasswd -c -i -b $BASE_PATH/var/cadvisor/auth.htpasswd ${DEFAULT_LOGIN} ${DEFAULT_PASSWORD}
+if [ "${ENABLED_LETSENCRYPT}" == "1" ]; then
 
 	docker run -d \
   	-v $BASE_PATH/var/certs:/etc/nginx/certs:rw \
@@ -238,29 +240,9 @@ sub_start_proxy(){
   	--volumes-from nginx-proxy \
 	--name letsencript \
 	--restart always \
-	jrcs/letsencrypt-nginx-proxy-companion:v1.12.1
+	${NAME_DOCKER_IMAGE_LETSENCRYPT}
 
-  docker run \
-    -d \
-    --name cadvisor \
-    --expose 8080 \
-    --restart always \
-    --network=cadvisor \
-    --mount type=bind,source="$BASE_PATH/var/cadvisor",destination="/home/cadvisor" \
-    --volume=/:/rootfs:ro \
-    --volume=/var/run:/var/run:ro \
-    --volume=/sys:/sys:ro \
-    --volume=/var/lib/docker/:/var/lib/docker:ro \
-    --volume=/dev/disk/:/dev/disk:ro \
-    -e TZ=Europe/Madrid \
-    -e VIRTUAL_HOST=$DOMAIN_NAME_MONITOR  \
-    -e VIRTUAL_PORT=8080 \
-    -e LETSENCRYPT_HOST=$DOMAIN_NAME_MONITOR \
-    -e LETSENCRYPT_EMAIL=${SERVICES_MASTER_EMAIL} \
-    --entrypoint "/usr/bin/cadvisor" \
-    google/cadvisor:v0.31.0 \
-    -logtostderr --http_auth_file /home/cadvisor/auth.htpasswd --http_auth_realm $DOMAIN_NAME_MONITOR
- 
+fi
 
 
 
@@ -272,9 +254,6 @@ sub_stop_proxy(){
   docker container stop nginx-proxy 
   docker container rm nginx-proxy 
 
-  #Sistema de monitorizacion
-  docker container stop cadvisor 
-  docker container rm cadvisor 
 
   docker container stop letsencript
   docker container rm letsencript
@@ -479,7 +458,7 @@ start_database() {
     -e MYSQL_USER=${APP_NAME} \
     -e MYSQL_PASSWORD=${APP_NAME} \
     -e MYSQL_ROOT_HOST=% \
-    mysql/mysql-server:5.5.61 \
+    ${NAME_DOCKER_IMAGE_MYSQL} \
     --lower_case_table_names=1 --max_allowed_packet=64M
 
   echo "Esperando a que arranque la base de datos..."
@@ -555,7 +534,7 @@ load_project_properties
     -e VIRTUAL_PORT=8080 \
     -e LETSENCRYPT_HOST=$VIRTUAL_HOST \
     -e LETSENCRYPT_EMAIL=${SERVICES_MASTER_EMAIL} \
-    tomcat:7.0.91-jre7
+    ${NAME_DOCKER_IMAGE_TOMCAT}
 
    echo "Web App arrancada"
 }
@@ -692,7 +671,7 @@ sub_start_jenkins() {
     -e SECRET_KEY=$SECRET_KEY \
     -e JAVA_OPTS="-Xmx600m" \
     -m 700m \
-    jenkins/jenkins:2.144
+    ${NAME_DOCKER_IMAGE_JENKINS}
 
     #Esperar a que arranque y haga todo el sistema de directorios
     echo "esperando a que se inicie Jenkins"
@@ -1011,7 +990,7 @@ popd
   --mount type=bind,source="$APP_BASE_PATH/dist",destination="/opt/dist" \
   -e APP_ENVIRONMENT=${APP_ENVIRONMENT} \
   -e TZ=Europe/Madrid \
-  openjdk:7u181-jdk \
+  ${NAME_DOCKER_IMAGE_JDK_BUILDER} \
   /opt/dist/dist.sh
 
   docker container rm dist-${APP_NAME}-${APP_ENVIRONMENT}
@@ -1074,12 +1053,12 @@ sub_docker_logs() {
 	echo "******************END:docker logs letsencript **************************"
 	log_separators
 
-	echo "******************BEGIN:docker logs cadvisor **************************"
+	echo "******************BEGIN:fail2ban **************************"
 	echo
-	docker logs cadvisor
+	fail2ban-client status
 	echo -en "\e[0m"
 	echo
-	echo "******************END:docker logs cadvisor **************************"
+	echo "******************END:fail2ban **************************"
 	log_separators
 
 }

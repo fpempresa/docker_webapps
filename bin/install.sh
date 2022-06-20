@@ -13,7 +13,7 @@ BASE_PATH=$ABSDIR/..
 
 DEFAULT_LOGIN=""
 while [ "$DEFAULT_LOGIN" == "" ]; do
-	read -p "Usuario para los servicios generales(Ej: Servicio de Monitorizacion):" DEFAULT_LOGIN
+	read -p "Usuario para los servicios generales(Ej: Jenkins):" DEFAULT_LOGIN
 done
 
 DEFAULT_PASSWORD=""
@@ -33,10 +33,7 @@ if [ "$DEFAULT_PASSWORD" != "$REPEAT_DEFAULT_PASSWORD" ]; then
   exit 1
 fi
 
-DOMAIN_NAME_MONITOR=""
-while [ "$DOMAIN_NAME_MONITOR" == "" ]; do 
-	read -p "Dominio del sistema de monitorizacion(Ej: monitor.midominio.com):" DOMAIN_NAME_MONITOR
-done
+
 
 apt -y update && apt -y upgrade
 
@@ -44,37 +41,41 @@ apt -y update && apt -y upgrade
 apt install -y apache2-utils zip unzip curl
 
 #Para evitar ataques de fuerza bruta
-apt install -y denyhosts
+apt install -y fail2ban
+systemctl enable fail2ban
+systemctl start fail2ban
+#Para personalizar fail2ban usar el fichero jail.local
+cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+#guias fail2ban
+#https://www.howtoforge.com/how-to-install-fail2ban-on-ubuntu-22-04/
+#https://howto88.com/es/instale-configure-y-use-fail2ban-en-el-servidor-ubuntu-20-04-lts
+
 
 #Para que se instale de forma automática los parches de seguridad 
 apt install -y unattended-upgrades
 dpkg-reconfigure unattended-upgrades
 
-#Docker
-apt install -y $BASE_PATH/bin/private/docker/docker-ce_18.06.1~ce~3-0~ubuntu_amd64.deb
+#Instalar Docker
+apt-get remove docker docker-engine docker.io containerd runc 
+apt-get install ca-certificates curl gnupg lsb-release
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update
+apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
+#Establecer el tamaño de los log
 systemctl stop docker.service
-cp $BASE_PATH/bin/private/docker/daemon.json /etc/docker
+echo "{  \"log-driver\": \"json-file\",    \"log-opts\": {        \"max-size\": \"20m\",        \"max-file\": \"8\"    } }" > /etc/docker/daemon.json
 systemctl start docker.service
 systemctl enable docker.service
 
 
-#Cargar las imagenes
-pushd .
-cd $BASE_PATH/bin/private/docker/
-cat docker_images_* > docker_images.zip
-unzip -t docker_images.zip
-unzip docker_images.zip
-for IMAGE_NAME in $(ls *.docker.img.tar); do
-   docker image load  -i $IMAGE_NAME
-   rm -f $IMAGE_NAME
-done
-rm docker_images.zip
-popd
 
 echo "DEFAULT_LOGIN=${DEFAULT_LOGIN}" > $BASE_PATH/config/global.config
 echo "DEFAULT_PASSWORD='${DEFAULT_PASSWORD}'" >> $BASE_PATH/config/global.config
-echo "DOMAIN_NAME_MONITOR=${DOMAIN_NAME_MONITOR}" >> $BASE_PATH/config/global.config
+
+
 
 #Crear el PIPE
 PIPE=$BASE_PATH/var/pipe_send_to_server_command
