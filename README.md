@@ -1,10 +1,10 @@
-# docker_webapps_22
+# docker_webapps
 Nueva versión de los scripts de creación de EmpleaFP
 
 ``` script
 passwd
 cd /opt
-git clone https://github.com/fpempresa/docker_webapps_22.git
+git clone https://github.com/fpempresa/docker_webapps.git
 cd ./docker_webapps/bin
 ./install.sh
 
