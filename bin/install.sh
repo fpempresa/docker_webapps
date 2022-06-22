@@ -11,29 +11,6 @@ ABSDIR=$(dirname $ABSPATH)
 
 BASE_PATH=$ABSDIR/..
 
-DEFAULT_LOGIN=""
-while [ "$DEFAULT_LOGIN" == "" ]; do
-	read -p "Usuario para los servicios generales(Ej: Jenkins):" DEFAULT_LOGIN
-done
-
-DEFAULT_PASSWORD=""
-while [ "$DEFAULT_PASSWORD" == "" ]; do
-	read -s -p "Contraseña del usuario $DEFAULT_LOGIN:" DEFAULT_PASSWORD
-done
-echo
-
-REPEAT_DEFAULT_PASSWORD=""
-while [ "$REPEAT_DEFAULT_PASSWORD" == "" ]; do
-	read -s -p "Repite la contraseña:" REPEAT_DEFAULT_PASSWORD
-done
-echo
-
-if [ "$DEFAULT_PASSWORD" != "$REPEAT_DEFAULT_PASSWORD" ]; then
-	echo las contraseñas no coinciden
-  exit 1
-fi
-
-
 
 apt -y update && apt -y upgrade
 
@@ -74,25 +51,6 @@ systemctl enable docker.service
 
 
 
-echo "DEFAULT_LOGIN=${DEFAULT_LOGIN}" > $BASE_PATH/config/global.config
-echo "DEFAULT_PASSWORD='${DEFAULT_PASSWORD}'" >> $BASE_PATH/config/global.config
-
-
-
-#Crear el PIPE
-PIPE=$BASE_PATH/var/pipe_send_to_server_command
-if [[ ! -p "$PIPE" ]]; then
-  mkfifo "$PIPE"
-  chmod ugo+rw $PIPE
-fi
-#Crear al servicio
-cp $BASE_PATH/bin/private/docker_host_comm/docker_host_comm.service /lib/systemd/system
-#Poner bien la ruta
-sed -i "s/_BASE_PATH_/$(echo $BASE_PATH | sed s/\\//\\\\\\//g)/g" /lib/systemd/system/docker_host_comm.service
-#Iniciar el servicio
-systemctl start docker_host_comm.service
-systemctl enable docker_host_comm.service
-
 #Reiniciar el servidor todas los domingos de madrugada
 echo '0 2 * * 0 root reboot' >> /etc/crontab
 
@@ -109,5 +67,3 @@ echo ""
 echo ""
 echo "Ahora deberas añadir las aplicaciones con:"
 echo "./webapp.sh add "
-echo "./webapp.sh start_jenkins <nombre_app> <environment>"
-echo "Y desde Jenkins ejecutar 'compile_and_deploy'"

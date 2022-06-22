@@ -30,7 +30,6 @@ APP_BASE_PATH=$BASE_PATH/apps/$APP_NAME/$APP_ENVIRONMENT
 
 NAME_DOCKER_IMAGE_TOMCAT=tomcat:7.0.94-jre7
 NAME_DOCKER_IMAGE_MYSQL=mysql/mysql-server:5.5.61
-NAME_DOCKER_IMAGE_JENKINS=jenkins/jenkins:2.144
 NAME_DOCKER_IMAGE_PROXY=nginxproxy/nginx-proxy:1.0.1
 NAME_DOCKER_IMAGE_LETSENCRYPT=nginxproxy/acme-companion:2.2.1
 NAME_DOCKER_IMAGE_JDK_BUILDER=openjdk:7u181-jdk
@@ -47,7 +46,7 @@ sub_help(){
     echo "    start_proxy : Inicia el proxy y sus dependencias (certificadoss,etc)."
     echo "    stop_proxy : Para el proxy y sus dependencias (certificadoss,etc)."
     echo "    restart_proxy : Reinicia el proxy y sus dependencias (certificadoss,etc)."
-    echo "    restart_all : Reinicia el proxy y el resto de las aplicaciones web y jenkins que estubieran arrancadas"
+    echo "    restart_all : Reinicia el proxy y el resto de las aplicaciones web"
     echo ""
     echo "    add   : Añade una aplicacion y todos sus entornos. Pero no inicia las maquinas"
     echo "    remove   : Borrar una aplicación, Para las maquinas y borrar toda la información"
@@ -61,11 +60,6 @@ sub_help(){
     echo ""
     echo "    backup_database  <app name> <environment> : Backup de la base de datos de un entorno"	
     echo "    restore_database  <app name> <environment>  [DIA|MES] [<numero>] [<backup_environment>]  : Restore de la base de datos de un entorno"	
-    echo ""
-    echo "    start_jenkins <app name> <environment> : Inicia la máquina de Jenkins"
-    echo "    stop_jenkins <app name> <environment> : Para la máquina de Jenkins"
-    echo "    restart_jenkins <app name> <environment> : Reinicia la maquina sin borrar los datos"
-    echo "    restart_hard_jenkins <app name> <environment> : Reinicia la maquina borrando todos los datos"
     echo ""
     echo "    delete_logs  <app name> <environment> : Imprimer un mensaje. Se usapara comprobar probar si se tiene acceso al script"
 }
@@ -220,14 +214,6 @@ sub_start_proxy(){
 				docker network connect webapp-${APP_NAME}-${APP_ENVIRONMENT} nginx-proxy
 			fi
 
-			if [ "$(docker network ls | grep  jenkins-${APP_NAME}-${APP_ENVIRONMENT})" == "" ]; then
-				docker network create jenkins-${APP_NAME}-${APP_ENVIRONMENT}
-			fi
-
-			if [ "$(docker network inspect jenkins-${APP_NAME}-${APP_ENVIRONMENT} | grep  nginx-proxy)" == "" ]; then
-				docker network connect jenkins-${APP_NAME}-${APP_ENVIRONMENT} nginx-proxy
-			fi
-
     done
 	done
 
@@ -277,42 +263,20 @@ sub_restart_all(){
 			APP_BASE_PATH=$BASE_PATH/apps/$APP_NAME/$APP_ENVIRONMENT
 
 			ENABLE_WEBAPP=$(get_app_config_value ${APP_ENVIRONMENT}_ENABLE_WEBAPP)
-			ENABLE_JENKINS=$(get_app_config_value ${APP_ENVIRONMENT}_ENABLE_JENKINS)
 
-			echo "La app '$APP_NAME' en entorno $APP_ENVIRONMENT ENABLE_WEBAPP=${ENABLE_WEBAPP} ENABLE_JENKINS=${ENABLE_JENKINS}"
+			echo "La app '$APP_NAME' en entorno $APP_ENVIRONMENT ENABLE_WEBAPP=${ENABLE_WEBAPP} "
 
 			if [ "${ENABLE_WEBAPP}" == "1" ]; then
 				sub_restart
 
 			fi
 
-			if [ "${ENABLE_JENKINS}" == "1" ]; then
-				sub_restart_jenkins
-			fi
 		done
 	done
 
 }
 
-sub_restart_all_jenkins(){
 
-	for APP_FILE_NAME in $(find $BASE_PATH/config -maxdepth 1 -name "*.app.config" -printf "%f\n"); do
-		APP_NAME=$(echo ${APP_FILE_NAME} | sed -e "s/.app.config//")
-		for APP_ENVIRONMENT in ${ENVIRONMENTS}; do
-			APP_BASE_PATH=$BASE_PATH/apps/$APP_NAME/$APP_ENVIRONMENT
-
-			ENABLE_JENKINS=$(get_app_config_value ${APP_ENVIRONMENT}_ENABLE_JENKINS)
-
-			echo "La app '$APP_NAME' en entorno $APP_ENVIRONMENT ENABLE_JENKINS=${ENABLE_JENKINS}"
-
-
-			if [ "${ENABLE_JENKINS}" == "1" ]; then
-				sub_restart_jenkins
-			fi
-		done
-	done
-
-}
 
 
 sub_add(){
@@ -344,7 +308,7 @@ sub_add(){
 
 
 	for APP_ENVIRONMENT in ${ENVIRONMENTS}; do
-		mkdir -p $BASE_PATH/apps/$APP_NAME/${APP_ENVIRONMENT}/{database,database_logs,database_backup,web_logs,web_app,web_temp,jenkins,dist}
+		mkdir -p $BASE_PATH/apps/$APP_NAME/${APP_ENVIRONMENT}/{database,database_logs,database_backup,web_logs,web_app,web_temp,dist}
 	done 
 
 
@@ -357,7 +321,6 @@ sub_add(){
 	set_app_config_value HOUR_PERIODIC_TASKS $HOUR_PERIODIC_TASKS
 	for APP_ENVIRONMENT in ${ENVIRONMENTS}; do
 		set_app_config_value ${APP_ENVIRONMENT}_ENABLE_WEBAPP 0
-		set_app_config_value ${APP_ENVIRONMENT}_ENABLE_JENKINS 0
 	done
 
 
@@ -405,7 +368,6 @@ fi
     set +e
     for APP_ENVIRONMENT in ${ENVIRONMENTS}; do
       sub_stop
-      sub_stop_jenkins
 
       set +e
       docker network disconnect ${APP_NAME}-${APP_ENVIRONMENT} nginx-proxy
@@ -600,206 +562,9 @@ sub_restart(){
 
 
 
-sub_start_jenkins() {
-
-  check_app_name_environment_arguments
-
-  load_project_properties
-
-  local REAL_HARD=0
-
-  if [ "$HARD_START" == "1" ] || [ -z "$(ls -A $APP_BASE_PATH/jenkins)" ]; then
-		  echo "Inicio Borrando de Jenkins"
-      REAL_HARD=1
-  fi
-
-
-  if [ "$APP_ENVIRONMENT" == "PRODUCCION" ]; then
-    VIRTUAL_HOST=$DOMAIN_NAME_JENKINS_PRODUCCION
-  elif [ "$APP_ENVIRONMENT" == "PREPRODUCCION" ]; then
-    VIRTUAL_HOST=$DOMAIN_NAME_JENKINS_PREPRODUCCION
-  elif [ "$APP_ENVIRONMENT" == "PRUEBAS" ]; then
-    VIRTUAL_HOST=$DOMAIN_NAME_JENKINS_PRUEBAS
-  else
-    echo "Entorno erroneo $APP_ENVIRONMENT"
-    exit 1
-  fi
-
-
-  if [ "$(docker network ls | grep  jenkins-${APP_NAME}-${APP_ENVIRONMENT})" == "" ]; then
-    docker network create jenkins-${APP_NAME}-${APP_ENVIRONMENT}
-  fi
-
-  if [ "$(docker network inspect jenkins-${APP_NAME}-${APP_ENVIRONMENT} | grep  nginx-proxy)" == "" ]; then
-    docker network connect jenkins-${APP_NAME}-${APP_ENVIRONMENT} nginx-proxy
-  fi
-
-  if [[ ! -p "$BASE_PATH/var/pipe_send_to_server_command" ]]; then
-    mkfifo "$BASE_PATH/var/pipe_send_to_server_command"
-  fi
-
-  if [[ ! -p "$APP_BASE_PATH/pipe_response_from_server_command" ]]; then
-    mkfifo "$APP_BASE_PATH/pipe_response_from_server_command"
-  fi
-
-  if [ "$REAL_HARD" == "1" ]; then
-	  rm -rf $APP_BASE_PATH/jenkins/*
-  fi
-
-  SECRET_KEY=$(openssl rand -hex 32)
-
-  docker container run \
-    -d \
-    --name jenkins-${APP_NAME}-${APP_ENVIRONMENT} \
-    --expose 8080 \
-    --restart always \
-    --network=jenkins-${APP_NAME}-${APP_ENVIRONMENT} \
-    --mount type=bind,source="$APP_BASE_PATH/jenkins",destination="/var/jenkins_home" \
-    --mount type=bind,source="$BASE_PATH/var/pipe_send_to_server_command",destination="/opt/jenkins_pipe/pipe_send_to_server_command" \
-    --mount type=bind,source="$APP_BASE_PATH/pipe_response_from_server_command",destination="/opt/jenkins_pipe/pipe_response_from_server_command" \
-    --mount type=bind,source="$BASE_PATH/bin/private/docker_host_comm/print_pipe",destination="/opt/jenkins_pipe/print_pipe" \
-    --mount type=bind,source="$APP_BASE_PATH/web_logs",destination="/var/jenkins_home/userContent/web_logs" \
-    --mount type=bind,source="$APP_BASE_PATH/database_logs",destination="/var/jenkins_home/userContent/database_logs" \
-    -e TZ=Europe/Madrid \
-    -e VIRTUAL_HOST=$VIRTUAL_HOST  \
-    -e VIRTUAL_PORT=8080 \
-    -e APP_NAME=${APP_NAME} \
-    -e APP_ENVIRONMENT=${APP_ENVIRONMENT} \
-    -e SERVICES_MASTER_EMAIL=${SERVICES_MASTER_EMAIL} \
-    -e LETSENCRYPT_HOST=$VIRTUAL_HOST \
-    -e LETSENCRYPT_EMAIL=${SERVICES_MASTER_EMAIL} \
-    -e SECRET_KEY=$SECRET_KEY \
-    -e JAVA_OPTS="-Xmx600m" \
-    -m 700m \
-    ${NAME_DOCKER_IMAGE_JENKINS}
-
-    #Esperar a que arranque y haga todo el sistema de directorios
-    echo "esperando a que se inicie Jenkins"
-    sleep 60
-
-  docker stop jenkins-${APP_NAME}-${APP_ENVIRONMENT}
-
-  #Volver a copiar siempre los Jobs por si hay alguno nuevo
-  cp -r $BASE_PATH/bin/private/jenkins/jobs $APP_BASE_PATH/jenkins
-
-  for job in $( ls $APP_BASE_PATH/jenkins/jobs ); do
-    if [ ! -f $APP_BASE_PATH/jenkins/jobs/${job}/nextBuildNumber ]; then
-      echo 1 > $APP_BASE_PATH/jenkins/jobs/${job}/nextBuildNumber
-    fi
-    if [ ! -d $APP_BASE_PATH/jenkins/jobs/${job}/builds ]; then
-      mkdir -p $APP_BASE_PATH/jenkins/jobs/${job}/builds
-    fi
-    if [ ! -f $APP_BASE_PATH/jenkins/jobs/${job}/builds/legacyIds ]; then
-      touch $APP_BASE_PATH/jenkins/jobs/${job}/builds/legacyIds
-    fi
-  done
 
 
 
-
-  #Borrar los jobs que ya no existen
-  for job in $( ls $APP_BASE_PATH/jenkins/jobs ); do
-    if [ ! -d $BASE_PATH/bin/private/jenkins/jobs/${job} ]; then
-      rm -rf $APP_BASE_PATH/jenkins/jobs/${job}
-    fi
-  done
-
-  #Poner las planificaciones
-  HOUR_PERIODIC_TASKS=$(get_app_config_value HOUR_PERIODIC_TASKS)
-	if [ "$APP_ENVIRONMENT" == "PRODUCCION" ]; then
-		CRON_BACKUP="0 $HOUR_PERIODIC_TASKS * * *"
-		CRON_DELETE_LOGS="45 $HOUR_PERIODIC_TASKS * * *"
-	elif [ "$APP_ENVIRONMENT" == "PREPRODUCCION" ]; then
-		CRON_BACKUP="20 $HOUR_PERIODIC_TASKS * * *"
-		CRON_DELETE_LOGS="50 $HOUR_PERIODIC_TASKS * * *"
-	elif [ "$APP_ENVIRONMENT" == "PRUEBAS" ]; then
-		CRON_BACKUP="35 $HOUR_PERIODIC_TASKS * * *"
-		CRON_DELETE_LOGS="55 $HOUR_PERIODIC_TASKS * * *"
-	else
-		echo "Entorno desconocido:$APP_ENVIRONMENT"
-		exit 1
-	fi
-	sed -i "s/<spec><\/spec>/<spec>${CRON_BACKUP}<\/spec>/g" $APP_BASE_PATH/jenkins/jobs/backup_database/config.xml
-	sed -i "s/<spec><\/spec>/<spec>${CRON_DELETE_LOGS}<\/spec>/g" $APP_BASE_PATH/jenkins/jobs/delete_logs/config.xml
-
-  if [ "$REAL_HARD" == "1" ]; then
-    cp -r $BASE_PATH/bin/private/jenkins/base/* $APP_BASE_PATH/jenkins
-    pushd .
-    cd $APP_BASE_PATH/jenkins
-
-    rm secrets/initialAdminPassword
-
-
-    mv users/admin users/system_builder
-    sed -i "s/<fullName>admin<\/fullName>/<fullName>system_builder<\/fullName>/g" users/system_builder/config.xml
-    JENKINS_HASH_PASSWORD=$(htpasswd -bnBC 10 "" $SERVICES_MASTER_PASSWORD | tr -d ':\n' | sed 's/$2y/$2a/' | sed "s/\//\\\\\//g")
-    sed -i "s/<passwordHash>#jbcrypt:.*<\/passwordHash>/<passwordHash>#jbcrypt:$JENKINS_HASH_PASSWORD<\/passwordHash>/g" users/system_builder/config.xml
-
-
-    sed -i "s/<installStateName>NEW<\/installStateName>/<installStateName>RUNNING<\/installStateName>\n  <systemMessage>Aplicación de ${APP_NAME} en el entorno de ${APP_ENVIRONMENT}<\/systemMessage>/g" config.xml
-    sed -i "s/<slaveAgentPort>-1<\/slaveAgentPort>/<slaveAgentPort>50000<\/slaveAgentPort>/g" config.xml
-    sed -i "s/<numExecutors>2<\/numExecutors>/<numExecutors>1<\/numExecutors>/g" config.xml
-
-    echo -n "2.144" > jenkins.install.InstallUtil.lastExecVersion
-
-    echo "<?xml version='1.1' encoding='UTF-8'?>" > jenkins.model.JenkinsLocationConfiguration.xml
-    echo "<jenkins.model.JenkinsLocationConfiguration>" >> jenkins.model.JenkinsLocationConfiguration.xml
-    echo "  <adminAddress>${APP_NAME}-${APP_ENVIRONMENT}-Jenkins &lt;${SERVICES_MASTER_EMAIL}&gt;</adminAddress>" >> jenkins.model.JenkinsLocationConfiguration.xml
-    echo "  <jenkinsUrl>http://${VIRTUAL_HOST}</jenkinsUrl>" >> jenkins.model.JenkinsLocationConfiguration.xml
-    echo "</jenkins.model.JenkinsLocationConfiguration>" >> jenkins.model.JenkinsLocationConfiguration.xml
-
-    sed -i "s/<hudsonUrl><\/hudsonUrl>/<hudsonUrl>${VIRTUAL_HOST}<\/hudsonUrl>/g" hudson.tasks.Mailer.xml
-    sed -i "s/<smtpAuthUsername><\/smtpAuthUsername>/<smtpAuthUsername>${SERVICES_MASTER_EMAIL}<\/smtpAuthUsername>/g" hudson.tasks.Mailer.xml
-    sed -i "s/<smtpAuthPassword><\/smtpAuthPassword>/<smtpAuthPassword>$SERVICES_MASTER_PASSWORD<\/smtpAuthPassword>/g" hudson.tasks.Mailer.xml
-    sed -i "s/<smtpHost><\/smtpHost>/<smtpHost>${MAIL_SMTP_SERVER}<\/smtpHost>/g" hudson.tasks.Mailer.xml
-
-    popd
-  fi 
-
-      find $APP_BASE_PATH/jenkins -type d -exec chmod 777 {} \;
-      find $APP_BASE_PATH/jenkins -type f -exec chmod 666 {} \;
-
-	docker start jenkins-${APP_NAME}-${APP_ENVIRONMENT}
-
-	set_app_config_value ${APP_ENVIRONMENT}_SECRET_KEY $SECRET_KEY	
-	set_app_config_value ${APP_ENVIRONMENT}_ENABLE_JENKINS 1	
-
-
-
-  echo "Arrancado Jenkins ${APP_NAME}-${APP_ENVIRONMENT}"
-}
-
-
-
-
-
-sub_stop_jenkins() {
-  check_app_name_environment_arguments
-
-  set +e
-  docker container stop jenkins-${APP_NAME}-${APP_ENVIRONMENT}
-  docker container rm jenkins-${APP_NAME}-${APP_ENVIRONMENT}
-  set -e
-
-set_app_config_value ${APP_ENVIRONMENT}_ENABLE_JENKINS 0
-
-  echo "Detenido Jenkins ${APP_NAME}-${APP_ENVIRONMENT}"
-}
-
-sub_restart_hard_jenkins() {
-  check_app_name_environment_arguments
-
-  HARD_START=1
-
-	sub_stop_jenkins
-	sub_start_jenkins
-}
-
-sub_restart_jenkins() {
-  check_app_name_environment_arguments
-	sub_stop_jenkins
-	sub_start_jenkins
-}
 
 
 
@@ -1010,10 +775,8 @@ popd
 
 sub_delete_logs() {
   check_app_name_environment_arguments
-	echo "" > $(docker inspect --format='{{.LogPath}}' database-${APP_NAME}-${APP_ENVIRONMENT})
-	echo "" > $(docker inspect --format='{{.LogPath}}' tomcat-${APP_NAME}-${APP_ENVIRONMENT})
-	echo "" > $(docker inspect --format='{{.LogPath}}' jenkins-${APP_NAME}-${APP_ENVIRONMENT})
-	find $APP_BASE_PATH/web_logs/* -mtime +15 -delete
+  find $APP_BASE_PATH/web_logs/* -mtime +15 -delete
+  find $APP_BASE_PATH/database_logs/* -mtime +15 -delete
 
    echo "Logs borrados"
 }
