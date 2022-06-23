@@ -52,7 +52,7 @@ systemctl enable docker.service
 
 
 #Reiniciar el servidor todas los domingos de madrugada
-echo '0 2 * * 0 root reboot' >> /etc/crontab
+echo '0 7 * * 0 root reboot' >> /etc/crontab
 
 #Iniciar el proxy
 $BASE_PATH/bin/webapp.sh start_proxy
