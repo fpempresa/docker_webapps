@@ -49,7 +49,8 @@ echo "{  \"log-driver\": \"json-file\",    \"log-opts\": {        \"max-size\": 
 systemctl start docker.service
 systemctl enable docker.service
 
-
+#Timezone
+timedatectl set-timezone Europe/Madrid
 
 #Reiniciar el servidor todas los domingos de madrugada
 echo '0 7 * * 0 root reboot' >> /etc/crontab
@@ -67,3 +68,4 @@ echo ""
 echo ""
 echo "Ahora deberas añadir las aplicaciones con:"
 echo "./webapp.sh add "
+echo "Para manejar las tareas, usa acciones de github en repositorios distintos para cada entorno "
