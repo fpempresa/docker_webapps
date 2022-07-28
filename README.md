@@ -3,6 +3,9 @@ Nueva versión de los scripts de creación de EmpleaFP
 
 ``` script
 passwd
+apt -y update
+apt -y upgrade
+reboot
 cd /opt
 git clone https://github.com/fpempresa/docker_webapps.git
 cd ./docker_webapps/bin

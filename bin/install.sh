@@ -12,7 +12,7 @@ ABSDIR=$(dirname $ABSPATH)
 BASE_PATH=$ABSDIR/..
 
 
-apt -y update && apt -y upgrade
+
 
 #Software basico
 apt install -y apache2-utils zip unzip curl
