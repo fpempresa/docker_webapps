@@ -660,7 +660,7 @@ echo Subiendo fichero $FILE_NAME_DIA
 
 FTP_LOG=$(mktemp  --tmpdir=$BASE_PATH/tmp --suffix=.ftp.log)
 
-ftp -inv $FTP_BACKUP_HOST <<EOF > $FTP_LOG 
+ftp -invA $FTP_BACKUP_HOST <<EOF > $FTP_LOG 
 user $FTP_BACKUP_USER $FTP_BACKUP_PASSWORD
 passive
 binary
