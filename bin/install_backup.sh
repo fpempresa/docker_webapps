@@ -25,4 +25,6 @@ timedatectl set-timezone Europe/Madrid
 #Reiniciar el servidor todas los domingos de madrugada
 echo '0 7 * * 0 root reboot' >> /etc/crontab
 
+mkdir /opt/backups_empleafp
+
 
