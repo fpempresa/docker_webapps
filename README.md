@@ -21,3 +21,17 @@ Y despues de instalar todo deberás para cada aplicación
 ```
 Y desde Jenkins ejecutar 'restore_database' y 'compile_and_deploy' 
 
+
+#Para el servidor de backup
+
+``` script
+passwd
+apt -y update
+apt -y upgrade
+reboot
+cd /opt
+git clone https://github.com/fpempresa/docker_webapps.git
+cd ./docker_webapps/bin
+./install_backup.sh
+
+```
