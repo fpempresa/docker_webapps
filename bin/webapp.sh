@@ -687,7 +687,7 @@ fi
 echo Fichero Subido 
 
 echo "Subiendo copia por SFTP $APP_BASE_PATH/database_backup/$FILE_NAME_DIA"
-sshpass -p "$SFTP_BACKUP_PASSWORD" scp "$APP_BASE_PATH/database_backup/$FILE_NAME_DIA" "$SFTP_BACKUP_USER"@"$SFTP_BACKUP_HOST":"$SFTP_BACKUP_ROOT_PATH/$FILE_NAME_DIA"
+sshpass -p "$SFTP_BACKUP_PASSWORD" scp -o StrictHostKeyChecking=no "$APP_BASE_PATH/database_backup/$FILE_NAME_DIA" "$SFTP_BACKUP_USER"@"$SFTP_BACKUP_HOST":"$SFTP_BACKUP_ROOT_PATH/$FILE_NAME_DIA"
 echo "Terminada copia por SFTP"
 
 rm $APP_BASE_PATH/database_backup/$FILE_NAME_DIA 
