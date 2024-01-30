@@ -22,7 +22,7 @@ Y despues de instalar todo deberás para cada aplicación
 Y desde Jenkins ejecutar 'restore_database' y 'compile_and_deploy' 
 
 
-#Para el servidor de backup
+# Para el servidor de backup
 
 ``` script
 passwd
