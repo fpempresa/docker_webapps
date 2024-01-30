@@ -617,7 +617,11 @@ sub_restore_database(){
   echo decargando fichero de backup $URL_FTP_FILE
   rm -f $APP_BASE_PATH/database_backup/$FILE_NAME
   rm -f $APP_BASE_PATH/database_backup/backup.sql
-  wget --user=$FTP_BACKUP_USER --password=$FTP_BACKUP_PASSWORD -P $APP_BASE_PATH/database_backup  $URL_FTP_FILE
+
+  sshpass -p "$SFTP_BACKUP_PASSWORD" scp -o StrictHostKeyChecking=no "$SFTP_BACKUP_USER"@"$SFTP_BACKUP_HOST":"$SFTP_BACKUP_ROOT_PATH/$FILE_NAME" "$APP_BASE_PATH/database_backup"
+  #wget --user=$FTP_BACKUP_USER --password=$FTP_BACKUP_PASSWORD -P $APP_BASE_PATH/database_backup  $URL_FTP_FILE
+
+
   unzip -t $APP_BASE_PATH/database_backup/$FILE_NAME
   unzip -d $APP_BASE_PATH/database_backup  $APP_BASE_PATH/database_backup/$FILE_NAME
   rm -f $APP_BASE_PATH/database_backup/$FILE_NAME
