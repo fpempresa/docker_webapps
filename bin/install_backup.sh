@@ -26,5 +26,6 @@ timedatectl set-timezone Europe/Madrid
 echo '0 7 * * 0 root reboot' >> /etc/crontab
 
 mkdir /opt/backups_empleafp
+chown ubuntu:ubuntu /opt/backups_empleafp
 
 

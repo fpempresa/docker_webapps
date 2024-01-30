@@ -15,7 +15,7 @@ BASE_PATH=$ABSDIR/..
 
 
 #Software basico
-apt install -y apache2-utils zip unzip curl
+apt install -y apache2-utils zip unzip curl sshpass
 
 #Para evitar ataques de fuerza bruta
 apt install -y fail2ban
