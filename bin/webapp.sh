@@ -659,36 +659,6 @@ sub_backup_database(){
   zip -j $APP_BASE_PATH/database_backup/$FILE_NAME_DIA $APP_BASE_PATH/database_backup/backup.sql
   unzip -t $APP_BASE_PATH/database_backup/$FILE_NAME_DIA
 
-echo Subiendo fichero $FILE_NAME_DIA
-
-
-FTP_LOG=$(mktemp  --tmpdir=$BASE_PATH/tmp --suffix=.ftp.log)
-
-ftp -invA $FTP_BACKUP_HOST <<EOF > $FTP_LOG 
-user $FTP_BACKUP_USER $FTP_BACKUP_PASSWORD
-passive
-binary
-cd $FTP_BACKUP_ROOT_PATH
-delete $FILE_NAME_DIA
-lcd $APP_BASE_PATH/database_backup
-put $FILE_NAME_DIA
-close
-bye
-EOF
-
-cat $FTP_LOG
-FTP_RET_CODE=0
-cat $FTP_LOG | grep -q '^226' || FTP_RET_CODE=1
-
-rm -f $FTP_LOG
-
-if [ "$FTP_RET_CODE" == "1" ]; then
-  echo "fallo el subir el fichero"
-  exit 1
-fi
-
-
-echo Fichero Subido 
 
 echo "Subiendo copia por SFTP $APP_BASE_PATH/database_backup/$FILE_NAME_DIA"
 sshpass -p "$SFTP_BACKUP_PASSWORD" scp -o StrictHostKeyChecking=no -P "$SFTP_BACKUP_PORT" "$APP_BASE_PATH/database_backup/$FILE_NAME_DIA" "$SFTP_BACKUP_USER"@"$SFTP_BACKUP_HOST":"$SFTP_BACKUP_ROOT_PATH/$FILE_NAME_DIA"
@@ -697,7 +667,7 @@ echo "Terminada copia por SFTP"
 rm $APP_BASE_PATH/database_backup/$FILE_NAME_DIA 
 
 
-echo "Backu database completado y subido"
+echo "Backup database completado y subido"
 
 
 
