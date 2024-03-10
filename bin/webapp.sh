@@ -201,6 +201,8 @@ sub_start_proxy(){
 			--name nginx-proxy \
 			${NAME_DOCKER_IMAGE_PROXY}
 
+  docker container exec nginx-proxy bash -c "echo 'server_tokens off;' >> /etc/nginx/conf.d/no_tokens.conf"
+  docker container restart nginx-proxy
 
   for APP_FILE_NAME in $(find $BASE_PATH/config -maxdepth 1 -name "*.app.config" -exec basename {} \;); do
 		APP_NAME=$(echo ${APP_FILE_NAME} | sed -e "s/.app.config//")
