@@ -55,8 +55,14 @@ timedatectl set-timezone Europe/Madrid
 #Reiniciar el servidor todas los domingos de madrugada
 echo '0 7 * * 0 root reboot' >> /etc/crontab
 
+echo "Introduce el correo general que se usará:"
+read VALUE_MAIL
+echo GLOBAL_EMAIL=${VALUE_MAIL} >> $BASE_PATH/config/global.config
+
+
 #Iniciar el proxy
 $BASE_PATH/bin/webapp.sh start_proxy
+
 
 
 echo ""

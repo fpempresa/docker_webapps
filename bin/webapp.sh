@@ -228,6 +228,7 @@ if [ "${ENABLED_LETSENCRYPT}" == "1" ]; then
   	--volumes-from nginx-proxy \
 	--name letsencript \
 	--restart always \
+	-e DEFAULT_EMAIL=${GLOBAL_EMAIL} \
 	${NAME_DOCKER_IMAGE_LETSENCRYPT}
 
 fi
